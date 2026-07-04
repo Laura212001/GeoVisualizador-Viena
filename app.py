@@ -1,5 +1,3 @@
-Hier ist dein komplettes app.py mit den exakten Dateinamen aus deinem GitHub-Ordner data.
-
 import streamlit as st
 import geopandas as gpd
 import pandas as pd
@@ -269,5 +267,3 @@ if table_cols:
     )
 else:
     st.write("Keine anzeigbaren Attribute gefunden.")
-
-Hinweis: Wenn du später die Dateinamen korrigierst (z. B. wieder Bezirksgrenze statt Bezirkgrenze), musst du die vier PATH_* Zeilen entsprechend anpassen. Danach in Streamlit Cloud Reboot.
