@@ -8,7 +8,8 @@ import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
 import tempfile
-from branca.colormap import linear
+import matplotlib.colors as mcolors
+from branca.colormap import LinearColormap
 
 # --------------------------------------------------
 # App-Konfiguration
@@ -16,7 +17,7 @@ from branca.colormap import linear
 st.set_page_config(page_title="GeoVisualizador Transporte Público - Viena", layout="wide")
 
 # --------------------------------------------------
-# Pfade (GENAU wie in deinem Repo)
+# Pfade
 # --------------------------------------------------
 PATH_HALTE = "data/OeffHaltetest_clp.shp"
 PATH_LINIEN = "data/Oefflinien_clp.shp"
@@ -94,11 +95,13 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
             arr[mask] = np.nan
             if np.all(np.isnan(arr)):
                 return
+
             vmin = np.nanpercentile(arr, 2)
             vmax = np.nanpercentile(arr, 98)
             norm = (arr - vmin) / (vmax - vmin)
             norm = np.clip(norm, 0, 1)
 
+            # Farben aus Matplotlib-Cmap
             cmap = plt.get_cmap(cmap_name)
             rgba = cmap(norm)
             rgba[..., 3] = np.where(np.isnan(arr), 0, alpha)
@@ -117,7 +120,9 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
                 cross_origin=False
             ).add_to(map_obj)
 
-            colormap = getattr(linear, cmap_name).scale(vmin, vmax)
+            # Farbleiste (branca) aus Matplotlib-Cmap bauen
+            colors = [mcolors.to_hex(cmap(x)) for x in np.linspace(0, 1, 256)]
+            colormap = LinearColormap(colors, vmin=vmin, vmax=vmax)
             colormap.caption = "Höhe (m)"
             colormap.add_to(map_obj)
     except Exception as e:
