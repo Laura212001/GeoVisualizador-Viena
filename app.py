@@ -1,3 +1,5 @@
+Hier ist dein komplettes app.py mit den exakten Dateinamen aus deinem GitHub-Ordner data.
+
 import streamlit as st
 import geopandas as gpd
 import pandas as pd
@@ -16,15 +18,15 @@ from branca.colormap import linear
 st.set_page_config(page_title="GeoVisualizador Transporte Público - Viena", layout="wide")
 
 # --------------------------------------------------
-# Pfade (an deine Dateien angepasst)
+# Pfade (GENAU wie in deinem Repo)
 # --------------------------------------------------
-PATH_HALTE = "data/OeffHaltestest_clp.shp"
+PATH_HALTE = "data/OeffHalttetest_clp.shp"
 PATH_LINIEN = "data/Oefflinien_clp.shp"
-PATH_BEZ   = "data/Bezirksgrenze.shp"
+PATH_BEZ   = "data/Bezirkgrenze.shp"
 PATH_DEM   = "data/dem_wien.tif"
 
 # Spaltennamen
-BEZ_NAME_COL = "NAMEG"        # Bezirksname (DÖBLING, ...)
+BEZ_NAME_COL = "NAMEG"        # Bezirksname
 BEZ_CODE_COL = "BEZ"          # 01, 02, ...
 HAL_NAME_COL = "HTXT"         # Haltestellenname
 HAL_LINES_COL = "HLINIEN"     # bediente Linien
@@ -65,12 +67,14 @@ gdf_hal, gdf_lin, gdf_bez = load_data()
 # Helfer
 # --------------------------------------------------
 def bezirksliste(gdf_bez):
-    vals = sorted(gdf_bez[BEZ_NAME_COL].astype(str).dropna().unique().tolist())
+    vals = sorted(gdf_bez[BEZ_NAME_COL].astype(str).dropna().unique().tolist()) if BEZ_NAME_COL in gdf_bez.columns else []
     return ["Alle"] + vals
 
 def filter_by_bezirk(gdf_pts, gdf_lin, gdf_bez, sel_name):
     if sel_name == "Alle":
         return gdf_pts, gdf_lin, None
+    if BEZ_NAME_COL not in gdf_bez.columns:
+        return gdf_pts.iloc[0:0], gdf_lin.iloc[0:0], None
     poly = gdf_bez[gdf_bez[BEZ_NAME_COL] == sel_name]
     if poly.empty:
         return gdf_pts.iloc[0:0], gdf_lin.iloc[0:0], None
@@ -156,18 +160,19 @@ if show_dem:
     add_dem_overlay(m, PATH_DEM, cmap_name="terrain", alpha=0.55)
 
 # Bezirke
-if show_bez:
-    if sel_bez == "Alle":
+if show_bez and not gdf_bez.empty:
+    if sel_bez == "Alle" or gdf_bez_sel is None:
         bez_draw = gdf_bez
         style = lambda f: {"fillColor": "#00000000", "color": "#555", "weight": 1.2}
     else:
         bez_draw = gdf_bez_sel
         style = lambda f: {"fillColor": "#ff990055", "color": "#ff9900", "weight": 2}
+    tooltip_fields = [BEZ_NAME_COL] if BEZ_NAME_COL in gdf_bez.columns else []
     folium.GeoJson(
-        bez_draw[[BEZ_NAME_COL, "geometry"]],
+        bez_draw[[*(tooltip_fields), "geometry"]],
         name="Bezirke",
         style_function=style,
-        tooltip=folium.features.GeoJsonTooltip(fields=[BEZ_NAME_COL], aliases=["Bezirk:"], sticky=False)
+        tooltip=folium.features.GeoJsonTooltip(fields=tooltip_fields, aliases=["Bezirk:"], sticky=False) if tooltip_fields else None
     ).add_to(m)
 
 # Linien
@@ -234,15 +239,18 @@ st.sidebar.metric("Fläche", f"{area:.2f} km²" if area else "—")
 # --------------------------------------------------
 st.markdown("### Haltestellen pro Bezirk")
 try:
-    joined = gpd.sjoin(gdf_hal, gdf_bez[[BEZ_NAME_COL, "geometry"]], predicate="within", how="inner")
-    counts = joined.groupby(BEZ_NAME_COL).size().sort_values(ascending=False)
-    fig, ax = plt.subplots(figsize=(9, 4))
-    counts.plot(kind="bar", ax=ax, color="#2b83ba")
-    ax.set_ylabel("Anzahl Haltestellen")
-    ax.set_xlabel("Bezirk")
-    ax.set_title("Haltestellen pro Bezirk")
-    plt.tight_layout()
-    st.pyplot(fig)
+    if BEZ_NAME_COL in gdf_bez.columns:
+        joined = gpd.sjoin(gdf_hal, gdf_bez[[BEZ_NAME_COL, "geometry"]], predicate="within", how="inner")
+        counts = joined.groupby(BEZ_NAME_COL).size().sort_values(ascending=False)
+        fig, ax = plt.subplots(figsize=(9, 4))
+        counts.plot(kind="bar", ax=ax, color="#2b83ba")
+        ax.set_ylabel("Anzahl Haltestellen")
+        ax.set_xlabel("Bezirk")
+        ax.set_title("Haltestellen pro Bezirk")
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.info("Bezirksname-Spalte nicht gefunden – Diagramm übersprungen.")
 except Exception as e:
     st.info(f"Diagramm konnte nicht erzeugt werden: {e}")
 
@@ -261,3 +269,5 @@ if table_cols:
     )
 else:
     st.write("Keine anzeigbaren Attribute gefunden.")
+
+Hinweis: Wenn du später die Dateinamen korrigierst (z. B. wieder Bezirksgrenze statt Bezirkgrenze), musst du die vier PATH_* Zeilen entsprechend anpassen. Danach in Streamlit Cloud Reboot.
