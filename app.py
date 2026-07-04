@@ -18,7 +18,7 @@ st.set_page_config(page_title="GeoVisualizador Transporte Público - Viena", lay
 # --------------------------------------------------
 # Pfade (GENAU wie in deinem Repo)
 # --------------------------------------------------
-PATH_HALTE = "data/OeffHalttetest_clp.shp"
+PATH_HALTE = "data/OeffHaltetest_clp.shp"
 PATH_LINIEN = "data/Oefflinien_clp.shp"
 PATH_BEZ   = "data/Bezirkgrenze.shp"
 PATH_DEM   = "data/dem_wien.tif"
