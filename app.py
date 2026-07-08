@@ -7,34 +7,36 @@ from streamlit_folium import st_folium
 import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
-import tempfile
 import matplotlib.colors as mcolors
+import tempfile
 from branca.colormap import LinearColormap
+from folium import MacroElement
+from jinja2 import Template
 
 # --------------------------------------------------
-# App-Konfiguration
+# Configuración de la app
 # --------------------------------------------------
-st.set_page_config(page_title="GeoVisualizador Transporte Público - Viena", layout="wide")
+st.set_page_config(page_title="GeoVisualizador de Transporte Público - Viena", layout="wide")
 
 # --------------------------------------------------
-# Pfade
+# Rutas de datos (según tu Explorer)
 # --------------------------------------------------
 PATH_HALTE = "data/OeffHaltetest_clp.shp"
 PATH_LINIEN = "data/Oefflinien_clp.shp"
 PATH_BEZ   = "data/Bezirkgrenze.shp"
 PATH_DEM   = "data/dem_wien.tif"
 
-# Spaltennamen
-BEZ_NAME_COL = "NAMEG"        # Bezirksname
-BEZ_CODE_COL = "BEZ"          # 01, 02, ...
-HAL_NAME_COL = "HTXT"         # Haltestellenname
-HAL_LINES_COL = "HLINIEN"     # bediente Linien
-HAL_WEB_COL = "WEBLINK1"      # Link
-LIN_NAME_COL = "LBEZEICHNU"   # Linienbezeichnung
-LIN_TYPE_COL = "LTYPTXT"      # Typ (Straßenbahn, S‑Bahn, ...)
+# Nombres de columnas
+BEZ_NAME_COL = "NAMEG"        # Nombre del distrito
+BEZ_CODE_COL = "BEZ"          # Código del distrito
+HAL_NAME_COL = "HTXT"         # Nombre de la parada
+HAL_LINES_COL = "HLINIEN"     # Líneas que paran
+HAL_WEB_COL = "WEBLINK1"      # Enlace
+LIN_NAME_COL = "LBEZEICHNU"   # Nombre de la línea
+LIN_TYPE_COL = "LTYPTXT"      # Tipo (Tranvía, S‑Bahn, ...)
 
 # --------------------------------------------------
-# Daten laden
+# Carga de datos
 # --------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_data():
@@ -42,7 +44,7 @@ def load_data():
     gdf_lin = gpd.read_file(PATH_LINIEN)
     gdf_bez = gpd.read_file(PATH_BEZ)
 
-    # Sicherstellen: WGS84
+    # Asegurar WGS84
     if not gdf_hal.crs or gdf_hal.crs.to_epsg() != 4326:
         gdf_hal = gdf_hal.to_crs(4326)
     if not gdf_lin.crs or gdf_lin.crs.to_epsg() != 4326:
@@ -50,7 +52,7 @@ def load_data():
     if not gdf_bez.crs or gdf_bez.crs.to_epsg() != 4326:
         gdf_bez = gdf_bez.to_crs(4326)
 
-    # Relevante Spalten
+    # Columnas relevantes
     keep_hal = [c for c in [HAL_NAME_COL, HAL_LINES_COL, HAL_WEB_COL] if c in gdf_hal.columns] + ["geometry"]
     keep_lin = [c for c in [LIN_NAME_COL, LIN_TYPE_COL] if c in gdf_lin.columns] + ["geometry"]
     keep_bez = [c for c in [BEZ_NAME_COL, BEZ_CODE_COL] if c in gdf_bez.columns] + ["geometry"]
@@ -63,14 +65,14 @@ def load_data():
 gdf_hal, gdf_lin, gdf_bez = load_data()
 
 # --------------------------------------------------
-# Helfer
+# Auxiliares
 # --------------------------------------------------
-def bezirksliste(gdf_bez):
+def lista_distritos(gdf_bez):
     vals = sorted(gdf_bez[BEZ_NAME_COL].astype(str).dropna().unique().tolist()) if BEZ_NAME_COL in gdf_bez.columns else []
-    return ["Alle"] + vals
+    return ["Todos"] + vals
 
-def filter_by_bezirk(gdf_pts, gdf_lin, gdf_bez, sel_name):
-    if sel_name == "Alle":
+def filtrar_por_distrito(gdf_pts, gdf_lin, gdf_bez, sel_name):
+    if sel_name == "Todos":
         return gdf_pts, gdf_lin, None
     if BEZ_NAME_COL not in gdf_bez.columns:
         return gdf_pts.iloc[0:0], gdf_lin.iloc[0:0], None
@@ -81,7 +83,7 @@ def filter_by_bezirk(gdf_pts, gdf_lin, gdf_bez, sel_name):
     lin_sel = gpd.sjoin(gdf_lin, poly[["geometry"]], predicate="intersects", how="inner").drop(columns=["index_right"])
     return pts_sel, lin_sel, poly
 
-def flaeche_km2(poly_gdf):
+def area_km2(poly_gdf):
     if poly_gdf is None or poly_gdf.empty:
         return None
     poly_m = poly_gdf.to_crs(3857)
@@ -101,7 +103,6 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
             norm = (arr - vmin) / (vmax - vmin)
             norm = np.clip(norm, 0, 1)
 
-            # Farben aus Matplotlib-Cmap
             cmap = plt.get_cmap(cmap_name)
             rgba = cmap(norm)
             rgba[..., 3] = np.where(np.isnan(arr), 0, alpha)
@@ -112,7 +113,7 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
             left, bottom, right, top = rasterio.transform.array_bounds(src.height, src.width, src.transform)
 
             folium.raster_layers.ImageOverlay(
-                name="DEM",
+                name="MDE",
                 image=tmp.name,
                 bounds=[[bottom, left], [top, right]],
                 opacity=1.0,
@@ -120,51 +121,50 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
                 cross_origin=False
             ).add_to(map_obj)
 
-            # Farbleiste (branca) aus Matplotlib-Cmap bauen
             colors = [mcolors.to_hex(cmap(x)) for x in np.linspace(0, 1, 256)]
             colormap = LinearColormap(colors, vmin=vmin, vmax=vmax)
-            colormap.caption = "Höhe (m)"
+            colormap.caption = "Elevación (m)"
             colormap.add_to(map_obj)
     except Exception as e:
-        st.warning(f"DEM konnte nicht geladen werden: {e}")
+        st.warning(f"No se pudo cargar el MDE: {e}")
 
 # --------------------------------------------------
-# Sidebar
+# Sidebar (español)
 # --------------------------------------------------
-st.sidebar.header("Layer")
-show_hal = st.sidebar.checkbox("Haltestellen", True)
-show_lin = st.sidebar.checkbox("Linien", True)
-show_bez = st.sidebar.checkbox("Bezirke", True)
-show_dem = st.sidebar.checkbox("DEM", True)
+st.sidebar.header("Capas")
+show_hal = st.sidebar.checkbox("Paradas", True)
+show_lin = st.sidebar.checkbox("Líneas", True)
+show_bez = st.sidebar.checkbox("Distritos", True)
+show_dem = st.sidebar.checkbox("MDE", True)
 
 st.sidebar.markdown("---")
-basemap = st.sidebar.radio("Basemap", ["OpenStreetMap", "Satellite"], index=0)
+basemap = st.sidebar.radio("Mapa base", ["OpenStreetMap", "Satélite"], index=0)
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("Bezirk auswählen")
-bezirk_opt = bezirksliste(gdf_bez)
-sel_bez = st.sidebar.selectbox("Bezirk", bezirk_opt, index=0)
+st.sidebar.subheader("Seleccionar distrito")
+opciones_distrito = lista_distritos(gdf_bez)
+sel_bez = st.sidebar.selectbox("Distrito", opciones_distrito, index=0)
 
-# Gefilterte Daten
-gdf_hal_f, gdf_lin_f, gdf_bez_sel = filter_by_bezirk(gdf_hal, gdf_lin, gdf_bez, sel_bez)
+# Datos filtrados
+gdf_hal_f, gdf_lin_f, gdf_bez_sel = filtrar_por_distrito(gdf_hal, gdf_lin, gdf_bez, sel_bez)
 
 # --------------------------------------------------
-# Karte
+# Mapa
 # --------------------------------------------------
-center = [48.2082, 16.3738]  # Wien
+center = [48.2082, 16.3738]  # Viena
 m = folium.Map(location=center, zoom_start=12, tiles=None)
 
-# Basemaps
+# Mapas base
 folium.TileLayer("OpenStreetMap", name="OpenStreetMap", show=(basemap == "OpenStreetMap")).add_to(m)
-folium.TileLayer("Esri.WorldImagery", name="Satellite", show=(basemap == "Satellite")).add_to(m)
+folium.TileLayer("Esri.WorldImagery", name="Satélite", show=(basemap == "Satélite")).add_to(m)
 
-# DEM
+# MDE
 if show_dem:
     add_dem_overlay(m, PATH_DEM, cmap_name="terrain", alpha=0.55)
 
-# Bezirke
+# Distritos
 if show_bez and not gdf_bez.empty:
-    if sel_bez == "Alle" or gdf_bez_sel is None:
+    if sel_bez == "Todos" or gdf_bez_sel is None:
         bez_draw = gdf_bez
         style = lambda f: {"fillColor": "#00000000", "color": "#555", "weight": 1.2}
     else:
@@ -173,12 +173,12 @@ if show_bez and not gdf_bez.empty:
     tooltip_fields = [BEZ_NAME_COL] if BEZ_NAME_COL in gdf_bez.columns else []
     folium.GeoJson(
         bez_draw[[*(tooltip_fields), "geometry"]],
-        name="Bezirke",
+        name="Distritos",
         style_function=style,
-        tooltip=folium.features.GeoJsonTooltip(fields=tooltip_fields, aliases=["Bezirk:"], sticky=False) if tooltip_fields else None
+        tooltip=folium.features.GeoJsonTooltip(fields=tooltip_fields, aliases=["Distrito:"], sticky=False) if tooltip_fields else None
     ).add_to(m)
 
-# Linien
+# Líneas
 if show_lin and not gdf_lin_f.empty:
     type_colors = {
         "Straßenbahn": "#d7191c",
@@ -196,79 +196,118 @@ if show_lin and not gdf_lin_f.empty:
     fields = [c for c in [LIN_NAME_COL, LIN_TYPE_COL] if c in gdf_lin_f.columns]
     folium.GeoJson(
         gdf_lin_f[fields + ["geometry"]] if fields else gdf_lin_f[["geometry"]],
-        name="Linien",
+        name="Líneas",
         style_function=style_line,
-        tooltip=folium.features.GeoJsonTooltip(fields=fields, aliases=["Linie:", "Typ:"], sticky=False) if fields else None
+        tooltip=folium.features.GeoJsonTooltip(fields=fields, aliases=["Línea:", "Tipo:"], sticky=False) if fields else None
     ).add_to(m)
 
-# Haltestellen
+# Leyenda categórica visible para líneas
+legend_html = """
+<div style="
+  position: fixed;
+  bottom: 90px; left: 10px;
+  z-index: 9999;
+  background-color: white;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;">
+  <b>Leyenda – Líneas</b><br>
+  <span style="background:#d7191c;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Tranvía<br>
+  <span style="background:#2c7bb6;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> S‑Bahn<br>
+  <span style="background:#fdae61;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Bus regional<br>
+  <span style="background:#1a9641;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Bus urbano<br>
+  <span style="background:#984ea3;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Tren
+</div>
+"""
+class Legend(MacroElement):
+    def __init__(self, html):
+        super().__init__()
+        self._template = Template(f"""{{% macro script(this, kwargs) %}}
+            var legend = $(`{legend_html}`);
+            $('body').append(legend);
+        {{% endmacro %}}""")
+Legend(legend_html).add_to(m)
+
+# Paradas
 if show_hal and not gdf_hal_f.empty:
     use_cols = [c for c in [HAL_NAME_COL, HAL_LINES_COL, HAL_WEB_COL] if c in gdf_hal_f.columns]
     draw_df = gdf_hal_f[use_cols + ["geometry"]] if use_cols else gdf_hal_f
     for _, r in draw_df.iterrows():
         lat, lon = r.geometry.y, r.geometry.x
         parts = []
-        if HAL_NAME_COL in r: parts.append(f"Haltestelle: {r[HAL_NAME_COL]}")
-        if HAL_LINES_COL in r: parts.append(f"Linien: {r[HAL_LINES_COL]}")
+        if HAL_NAME_COL in r: parts.append(f"Parada: {r[HAL_NAME_COL]}")
+        if HAL_LINES_COL in r: parts.append(f"Líneas: {r[HAL_LINES_COL]}")
         tooltip = "<br>".join(parts) if parts else None
-        popup = f'<a href="{r[HAL_WEB_COL]}" target="_blank">Fahrplan</a>' if (HAL_WEB_COL in r and pd.notna(r[HAL_WEB_COL])) else None
+        popup = f'<a href="{r[HAL_WEB_COL]}" target="_blank">Horario</a>' if (HAL_WEB_COL in r and pd.notna(r[HAL_WEB_COL])) else None
         folium.CircleMarker(
             [lat, lon], radius=2, color="#004b87", fill=True, fill_color="#2b83ba",
             fill_opacity=0.8, weight=0.3, tooltip=tooltip, popup=popup
         ).add_to(m)
 
-# Plugins + LayerControl
+# Plugins + control de capas
 MiniMap(toggle_display=True).add_to(m)
 Fullscreen(position="topleft").add_to(m)
 folium.LayerControl(collapsed=False).add_to(m)
 
+# --------------------------------------------------
+# Encabezado + Introducción
+# --------------------------------------------------
 st.markdown("### GeoVisualizador de Accesibilidad al Transporte Público en Viena")
+st.markdown(
+    "Explora la accesibilidad al transporte público en Viena. "
+    "En la barra lateral puedes activar/ocultar capas (paradas, líneas, distritos y MDE), "
+    "cambiar el mapa base y filtrar por distrito. En la parte inferior encontrarás estadísticas, "
+    "un gráfico con el número de paradas por distrito y una tabla de atributos."
+)
+
 out = st_folium(m, width="100%", height=650)
 
 # --------------------------------------------------
-# Statistik (Sidebar)
+# Estadísticas (sidebar)
 # --------------------------------------------------
 st.sidebar.markdown("---")
-st.sidebar.subheader("Statistik")
+st.sidebar.subheader("Estadísticas")
 anz_hal = len(gdf_hal_f)
 anz_lin_unique = gdf_lin_f[LIN_NAME_COL].nunique() if LIN_NAME_COL in gdf_lin_f.columns and not gdf_lin_f.empty else len(gdf_lin_f)
-area = flaeche_km2(gdf_bez_sel)
-st.sidebar.metric("Haltestellen", f"{anz_hal}")
-st.sidebar.metric("Linien (unique)", f"{anz_lin_unique}")
-st.sidebar.metric("Fläche", f"{area:.2f} km²" if area else "—")
+area = area_km2(gdf_bez_sel)
+st.sidebar.metric("Paradas", f"{anz_hal}")
+st.sidebar.metric("Líneas (únicas)", f"{anz_lin_unique}")
+st.sidebar.metric("Área", f"{area:.2f} km²" if area else "—")
 
 # --------------------------------------------------
-# Diagramm: Haltestellen pro Bezirk
+# Gráfico: Paradas por distrito
 # --------------------------------------------------
-st.markdown("### Haltestellen pro Bezirk")
+st.markdown("### Paradas por distrito")
 try:
     if BEZ_NAME_COL in gdf_bez.columns:
         joined = gpd.sjoin(gdf_hal, gdf_bez[[BEZ_NAME_COL, "geometry"]], predicate="within", how="inner")
         counts = joined.groupby(BEZ_NAME_COL).size().sort_values(ascending=False)
         fig, ax = plt.subplots(figsize=(9, 4))
         counts.plot(kind="bar", ax=ax, color="#2b83ba")
-        ax.set_ylabel("Anzahl Haltestellen")
-        ax.set_xlabel("Bezirk")
-        ax.set_title("Haltestellen pro Bezirk")
+        ax.set_ylabel("Número de paradas")
+        ax.set_xlabel("Distrito")
+        ax.set_title("Paradas por distrito")
         plt.tight_layout()
         st.pyplot(fig)
     else:
-        st.info("Bezirksname-Spalte nicht gefunden – Diagramm übersprungen.")
+        st.info("No se encontró la columna de nombre de distrito – se omite el gráfico.")
 except Exception as e:
-    st.info(f"Diagramm konnte nicht erzeugt werden: {e}")
+    st.info(f"No se pudo generar el gráfico: {e}")
 
 # --------------------------------------------------
-# Attributtabelle
+# Tabla de atributos
 # --------------------------------------------------
-st.markdown("### Attributtabelle – Haltestellen (gefiltert)")
+st.markdown("### Tabla de atributos – Paradas (filtradas)")
 table_cols = [c for c in [HAL_NAME_COL, HAL_LINES_COL, HAL_WEB_COL] if c in gdf_hal_f.columns]
 if table_cols:
     st.dataframe(
         gdf_hal_f[table_cols].rename(columns={
-            HAL_NAME_COL: "Haltestelle",
-            HAL_LINES_COL: "Linien",
-            HAL_WEB_COL: "Link"
+            HAL_NAME_COL: "Parada",
+            HAL_LINES_COL: "Líneas",
+            HAL_WEB_COL: "Enlace"
         })
     )
 else:
-    st.write("Keine anzeigbaren Attribute gefunden.")
+    st.write("No se encontraron atributos para mostrar.")
+
