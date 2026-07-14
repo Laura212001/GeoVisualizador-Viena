@@ -4,8 +4,13 @@ import pandas as pd
 import folium
 from folium.plugins import MiniMap, Fullscreen
 from streamlit_folium import st_folium
-import rasterio
 import numpy as np
+
+try:
+    import rasterio
+    RASTERIO_AVAILABLE = True
+except Exception:
+    RASTERIO_AVAILABLE = False
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import tempfile
@@ -90,41 +95,75 @@ def area_km2(poly_gdf):
     return float(poly_m.geometry.area.sum())/1e6
 
 def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
+
+    if not RASTERIO_AVAILABLE:
+        st.warning("Rasterio no disponible: se omite el modelo digital de elevación.")
+        return
+
     try:
         with rasterio.open(dem_path) as src:
             arr = src.read(1).astype(float)
+
             mask = src.read_masks(1) == 0
             arr[mask] = np.nan
+
             if np.all(np.isnan(arr)):
                 return
 
             vmin = np.nanpercentile(arr, 2)
             vmax = np.nanpercentile(arr, 98)
+
             norm = (arr - vmin) / (vmax - vmin)
             norm = np.clip(norm, 0, 1)
 
             cmap = plt.get_cmap(cmap_name)
             rgba = cmap(norm)
-            rgba[..., 3] = np.where(np.isnan(arr), 0, alpha)
 
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            rgba[..., 3] = np.where(
+                np.isnan(arr),
+                0,
+                alpha
+            )
+
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".png",
+                delete=False
+            )
+
             plt.imsave(tmp.name, rgba)
 
-            left, bottom, right, top = rasterio.transform.array_bounds(src.height, src.width, src.transform)
+            left, bottom, right, top = rasterio.transform.array_bounds(
+                src.height,
+                src.width,
+                src.transform
+            )
 
             folium.raster_layers.ImageOverlay(
                 name="MDE",
                 image=tmp.name,
-                bounds=[[bottom, left], [top, right]],
+                bounds=[
+                    [bottom, left],
+                    [top, right]
+                ],
                 opacity=1.0,
                 interactive=False,
                 cross_origin=False
             ).add_to(map_obj)
 
-            colors = [mcolors.to_hex(cmap(x)) for x in np.linspace(0, 1, 256)]
-            colormap = LinearColormap(colors, vmin=vmin, vmax=vmax)
+            colors = [
+                mcolors.to_hex(cmap(x))
+                for x in np.linspace(0, 1, 256)
+            ]
+
+            colormap = LinearColormap(
+                colors,
+                vmin=vmin,
+                vmax=vmax
+            )
+
             colormap.caption = "Elevación (m)"
             colormap.add_to(map_obj)
+
     except Exception as e:
         st.warning(f"No se pudo cargar el MDE: {e}")
 
@@ -159,8 +198,13 @@ folium.TileLayer("OpenStreetMap", name="OpenStreetMap", show=(basemap == "OpenSt
 folium.TileLayer("Esri.WorldImagery", name="Satélite", show=(basemap == "Satélite")).add_to(m)
 
 # MDE
-if show_dem:
-    add_dem_overlay(m, PATH_DEM, cmap_name="terrain", alpha=0.55)
+if show_dem and RASTERIO_AVAILABLE:
+    add_dem_overlay(
+        m,
+        PATH_DEM,
+        cmap_name="terrain",
+        alpha=0.55
+    )
 
 # Distritos
 if show_bez and not gdf_bez.empty:
