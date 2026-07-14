@@ -3,7 +3,7 @@ import geopandas as gpd
 import pandas as pd
 import folium
 from folium.plugins import MiniMap, Fullscreen
-from streamlit_folium import st_folium
+#from streamlit_folium import st_folium
 import numpy as np
 
 try:
@@ -210,9 +210,8 @@ st.markdown(
     "Test: mapa vacío para detectar el problema."
 )
 
-out = st_folium(
-    m,
-    width="100%",
+st.components.v1.html(
+    m._repr_html_(),
     height=650
 )
 
