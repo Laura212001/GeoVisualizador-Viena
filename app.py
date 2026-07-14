@@ -171,7 +171,7 @@ def add_dem_overlay(map_obj, dem_path, cmap_name="terrain", alpha=0.55):
 # Sidebar (español)
 # --------------------------------------------------
 st.sidebar.header("Capas")
-show_hal = st.sidebar.checkbox("Paradas", True)
+show_hal = st.sidebar.checkbox("Paradas", False)
 show_lin = st.sidebar.checkbox("Líneas", True)
 show_bez = st.sidebar.checkbox("Distritos", True)
 show_dem = st.sidebar.checkbox("MDE", True)
