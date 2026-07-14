@@ -188,111 +188,33 @@ sel_bez = st.sidebar.selectbox("Distrito", opciones_distrito, index=0)
 gdf_hal_f, gdf_lin_f, gdf_bez_sel = filtrar_por_distrito(gdf_hal, gdf_lin, gdf_bez, sel_bez)
 
 # --------------------------------------------------
-# Mapa
+# Mapa (TEST: nur leere Karte)
 # --------------------------------------------------
-center = [48.2082, 16.3738]  # Viena
-m = folium.Map(location=center, zoom_start=12, tiles=None)
 
-# Mapas base
-folium.TileLayer("OpenStreetMap", name="OpenStreetMap", show=(basemap == "OpenStreetMap")).add_to(m)
-folium.TileLayer("Esri.WorldImagery", name="Satélite", show=(basemap == "Satélite")).add_to(m)
+center = [48.2082, 16.3738]
 
-# MDE
-if show_dem and RASTERIO_AVAILABLE:
-    add_dem_overlay(
-        m,
-        PATH_DEM,
-        cmap_name="terrain",
-        alpha=0.55
-    )
+m = folium.Map(
+    location=center,
+    zoom_start=12
+)
 
-# Distritos
-if show_bez and not gdf_bez.empty:
-    if sel_bez == "Todos" or gdf_bez_sel is None:
-        bez_draw = gdf_bez
-        style = lambda f: {"fillColor": "#00000000", "color": "#555", "weight": 1.2}
-    else:
-        bez_draw = gdf_bez_sel
-        style = lambda f: {"fillColor": "#ff990055", "color": "#ff9900", "weight": 2}
-    tooltip_fields = [BEZ_NAME_COL] if BEZ_NAME_COL in gdf_bez.columns else []
-    folium.GeoJson(
-        bez_draw[[*(tooltip_fields), "geometry"]],
-        name="Distritos",
-        style_function=style,
-        tooltip=folium.features.GeoJsonTooltip(fields=tooltip_fields, aliases=["Distrito:"], sticky=False) if tooltip_fields else None
-    ).add_to(m)
+# Keine Layer zum Testen
 
-# Líneas
-if show_lin and not gdf_lin_f.empty:
-    type_colors = {
-        "Straßenbahn": "#d7191c",
-        "S-Bahn": "#2c7bb6",
-        "Regionalbus": "#fdae61",
-        "Stadtbus": "#1a9641",
-        "Zug": "#984ea3"
-    }
-    def style_line(ft):
-        t = ft["properties"].get(LIN_TYPE_COL, "")
-        color = type_colors.get(t, "#555")
-        weight = 4 if t in ["S-Bahn", "Zug"] else 3
-        return {"color": color, "weight": weight}
+# --------------------------------------------------
+# Encabezado + Introducción
+# --------------------------------------------------
 
-    fields = [c for c in [LIN_NAME_COL, LIN_TYPE_COL] if c in gdf_lin_f.columns]
-    folium.GeoJson(
-        gdf_lin_f[fields + ["geometry"]] if fields else gdf_lin_f[["geometry"]],
-        name="Líneas",
-        style_function=style_line,
-        tooltip=folium.features.GeoJsonTooltip(fields=fields, aliases=["Línea:", "Tipo:"], sticky=False) if fields else None
-    ).add_to(m)
+st.markdown("### GeoVisualizador de Accesibilidad al Transporte Público en Viena")
 
-# Leyenda categórica visible para líneas
-legend_html = """
-<div style="
-  position: fixed;
-  bottom: 90px; left: 10px;
-  z-index: 9999;
-  background-color: white;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;">
-  <b>Leyenda – Líneas</b><br>
-  <span style="background:#d7191c;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Tranvía<br>
-  <span style="background:#2c7bb6;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> S‑Bahn<br>
-  <span style="background:#fdae61;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Bus regional<br>
-  <span style="background:#1a9641;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Bus urbano<br>
-  <span style="background:#984ea3;width:12px;height:12px;display:inline-block;margin-right:6px;"></span> Tren
-</div>
-"""
-class Legend(MacroElement):
-    def __init__(self, html):
-        super().__init__()
-        self._template = Template(f"""{{% macro script(this, kwargs) %}}
-            var legend = $(`{legend_html}`);
-            $('body').append(legend);
-        {{% endmacro %}}""")
-Legend(legend_html).add_to(m)
+st.markdown(
+    "Test: mapa vacío para detectar el problema."
+)
 
-# Paradas
-if show_hal and not gdf_hal_f.empty:
-    use_cols = [c for c in [HAL_NAME_COL, HAL_LINES_COL, HAL_WEB_COL] if c in gdf_hal_f.columns]
-    draw_df = gdf_hal_f[use_cols + ["geometry"]] if use_cols else gdf_hal_f
-    for _, r in draw_df.iterrows():
-        lat, lon = r.geometry.y, r.geometry.x
-        parts = []
-        if HAL_NAME_COL in r: parts.append(f"Parada: {r[HAL_NAME_COL]}")
-        if HAL_LINES_COL in r: parts.append(f"Líneas: {r[HAL_LINES_COL]}")
-        tooltip = "<br>".join(parts) if parts else None
-        popup = f'<a href="{r[HAL_WEB_COL]}" target="_blank">Horario</a>' if (HAL_WEB_COL in r and pd.notna(r[HAL_WEB_COL])) else None
-        folium.CircleMarker(
-            [lat, lon], radius=2, color="#004b87", fill=True, fill_color="#2b83ba",
-            fill_opacity=0.8, weight=0.3, tooltip=tooltip, popup=popup
-        ).add_to(m)
-
-# Plugins + control de capas
-MiniMap(toggle_display=True).add_to(m)
-Fullscreen(position="topleft").add_to(m)
-folium.LayerControl(collapsed=False).add_to(m)
+out = st_folium(
+    m,
+    width="100%",
+    height=650
+)
 
 # --------------------------------------------------
 # Encabezado + Introducción
