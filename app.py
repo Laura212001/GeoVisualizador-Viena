@@ -305,7 +305,8 @@ st.markdown(
     "un gráfico con el número de paradas por distrito y una tabla de atributos."
 )
 
-out = st_folium(m, width="100%", height=650)
+# out = st_folium(m, width="100%", height=650)
+st.write("Karte deaktiviert")
 
 # --------------------------------------------------
 # Estadísticas (sidebar)
