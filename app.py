@@ -135,7 +135,7 @@ st.sidebar.header("Capas")
 show_hal = st.sidebar.checkbox("Paradas", True)
 show_lin = st.sidebar.checkbox("Líneas", True)
 show_bez = st.sidebar.checkbox("Distritos", True)
-show_dem = st.sidebar.checkbox("MDE", True)
+show_dem = st.sidebar.checkbox("MDE", False)
 
 st.sidebar.markdown("---")
 basemap = st.sidebar.radio("Mapa base", ["OpenStreetMap", "Satélite"], index=0)
