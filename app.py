@@ -62,8 +62,11 @@ def load_data():
 
     return gdf_hal, gdf_lin, gdf_bez
 
-gdf_hal, gdf_lin, gdf_bez = load_data()
-
+try:
+    gdf_hal, gdf_lin, gdf_bez = load_data()
+except Exception as e:
+    st.error(f"Fehler beim Laden der Geodaten: {e}")
+    st.stop()
 # --------------------------------------------------
 # Auxiliares
 # --------------------------------------------------
