@@ -163,8 +163,8 @@ folium.TileLayer("OpenStreetMap", name="OpenStreetMap", show=(basemap == "OpenSt
 folium.TileLayer("Esri.WorldImagery", name="Satélite", show=(basemap == "Satélite")).add_to(m)
 
 # MDE
-#if show_dem:
-#    add_dem_overlay(m, PATH_DEM, cmap_name="terrain", alpha=0.55)
+if show_dem:
+    add_dem_overlay(m, PATH_DEM, cmap_name="terrain", alpha=0.55)
 
 # Distritos
 if show_bez and not gdf_bez.empty:
@@ -282,22 +282,22 @@ st.sidebar.metric("Área", f"{area:.2f} km²" if area else "—")
 # --------------------------------------------------
 # Gráfico: Paradas por distrito
 # --------------------------------------------------
-#st.markdown("### Paradas por distrito")
-#try:
-#    if BEZ_NAME_COL in gdf_bez.columns:
-#        joined = gpd.sjoin(gdf_hal, gdf_bez[[BEZ_NAME_COL, "geometry"]], predicate="within", how="inner")
-#        counts = joined.groupby(BEZ_NAME_COL).size().sort_values(ascending=False)
-#        fig, ax = plt.subplots(figsize=(9, 4))
-#        counts.plot(kind="bar", ax=ax, color="#2b83ba")
-#        ax.set_ylabel("Número de paradas")
-#        ax.set_xlabel("Distrito")
-#        ax.set_title("Paradas por distrito")
-#        plt.tight_layout()
-#        st.pyplot(fig)
-#    else:
-#        st.info("No se encontró la columna de nombre de distrito – se omite el gráfico.")
-#except Exception as e:
-#    st.info(f"No se pudo generar el gráfico: {e}")
+st.markdown("### Paradas por distrito")
+try:
+    if BEZ_NAME_COL in gdf_bez.columns:
+        joined = gpd.sjoin(gdf_hal, gdf_bez[[BEZ_NAME_COL, "geometry"]], predicate="within", how="inner")
+        counts = joined.groupby(BEZ_NAME_COL).size().sort_values(ascending=False)
+        fig, ax = plt.subplots(figsize=(9, 4))
+        counts.plot(kind="bar", ax=ax, color="#2b83ba")
+        ax.set_ylabel("Número de paradas")
+        ax.set_xlabel("Distrito")
+        ax.set_title("Paradas por distrito")
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.info("No se encontró la columna de nombre de distrito – se omite el gráfico.")
+except Exception as e:
+    st.info(f"No se pudo generar el gráfico: {e}")
 
 # --------------------------------------------------
 # Tabla de atributos
