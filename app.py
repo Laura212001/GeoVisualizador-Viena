@@ -197,23 +197,9 @@ m = folium.Map(
     location=center,
     zoom_start=12
 )
-
+folium.TileLayer("OpenStreetMap").add_to(m)
 # Keine Layer zum Testen
 
-# --------------------------------------------------
-# Encabezado + Introducción
-# --------------------------------------------------
-
-st.markdown("### GeoVisualizador de Accesibilidad al Transporte Público en Viena")
-
-st.markdown(
-    "Test: mapa vacío para detectar el problema."
-)
-
-st.components.v1.html(
-    m._repr_html_(),
-    height=650
-)
 
 # --------------------------------------------------
 # Encabezado + Introducción
