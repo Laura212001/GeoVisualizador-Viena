@@ -146,7 +146,8 @@ basemap = st.sidebar.radio("Mapa base", ["OpenStreetMap", "Satélite"], index=0)
 st.sidebar.markdown("---")
 st.sidebar.subheader("Seleccionar distrito")
 opciones_distrito = lista_distritos(gdf_bez)
-sel_bez = st.sidebar.selectbox("Distrito", opciones_distrito, index=0)
+# 0 = "Todos", 1 = erster Bezirk in der Liste
+sel_bez = st.sidebar.selectbox("Distrito", opciones_distrito, index=1)
 
 # Datos filtrados
 gdf_hal_f, gdf_lin_f, gdf_bez_sel = filtrar_por_distrito(gdf_hal, gdf_lin, gdf_bez, sel_bez)
